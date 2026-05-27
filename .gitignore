@@ -1,0 +1,6 @@
+# Binaries
+expense-tracker-api
+*.exe
+
+# Configuration files
+app.conf
