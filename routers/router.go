@@ -14,6 +14,7 @@ func init() {
 
 		beego.NSNamespace("/auth",
 			beego.NSRouter("/register", &controllers.AuthController{}, "post:Register"),
+			beego.NSRouter("/login", &controllers.AuthController{}, "post:Login"),
 		),
 	)
 
