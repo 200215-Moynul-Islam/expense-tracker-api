@@ -43,6 +43,25 @@ type ExpenseListQueryParams struct {
 	Limit string
 }
 
+type ExpenseSummaryQueryParams struct {
+	DateFrom string
+	DateTo string
+}
+
+type CategorySummary struct {
+	Category string `json:"category"`
+	Total float64 `json:"total"`
+	Count int `json:"count"`
+}
+
+type ExpenseSummaryResponse struct {
+	DateFrom string `json:"date_from"`
+	DateTo string `json:"date_to"`
+	TotalAmount float64 `json:"total_amount"`
+	TotalCount int `json:"total_count"`
+	ByCategory []CategorySummary `json:"by_category"`
+}
+
 func (c *ExpenseController) Create() {
 	userID := c.Ctx.Input.GetData("userID").(int)
 
@@ -293,6 +312,42 @@ func (c *ExpenseController) Delete() {
 	c.Success(http.StatusOK, "Expense deleted successfully.", nil)
 }
 
+func (c *ExpenseController) GetSummary() {
+	userID := c.Ctx.Input.GetData("userID").(int)
+
+	expenses, err := models.GetExpensesByUserID(userID)
+	if err != nil {
+		logs.Error("failed to get expenses:", err)
+
+		c.Error(http.StatusInternalServerError, "Internal server error.")
+		return
+	}
+
+	queryParams := ExpenseSummaryQueryParams{
+		DateFrom: c.GetString("date_from"),
+		DateTo: c.GetString("date_to"),
+	}
+
+	normalizeExpenseSummaryQueryParams(&queryParams)
+
+	errMessage, err := validateExpenseSummaryQueryParams(queryParams)
+	if err != nil {
+		logs.Error("failed to validate expense summary query params:", err)
+
+		c.Error(http.StatusInternalServerError, "Internal server error.")
+		return
+	}
+
+	if errMessage != "" {
+		c.Error(http.StatusBadRequest, errMessage)
+		return
+	}
+
+	summary := generateExpenseSummary(expenses, queryParams)
+
+	c.Success(http.StatusOK, "Summary generated successfully.", summary)
+}
+
 // Private helper functions
 
 func normalizeCreateExpenseRequest(req *CreateExpenseRequest) {
@@ -316,6 +371,11 @@ func normalizeExpenseListQueryParams(params *ExpenseListQueryParams) {
 	params.SortBy = strings.TrimSpace(params.SortBy)
 	params.SortOrder = strings.TrimSpace(params.SortOrder)
 	params.Limit = strings.TrimSpace(params.Limit)
+}
+
+func normalizeExpenseSummaryQueryParams(params *ExpenseSummaryQueryParams) {
+	params.DateFrom = strings.TrimSpace(params.DateFrom)
+	params.DateTo = strings.TrimSpace(params.DateTo)
 }
 
 func validateCreateExpenseRequest(request CreateExpenseRequest) (string, error) {
@@ -401,13 +461,6 @@ func validateUpdateExpenseRequest(request UpdateExpenseRequest) (string, error) 
 }
 
 func validateExpenseListQueryParams(params ExpenseListQueryParams) (string, error) {
-	var validationEngine validation.Validation
-
-	_, err := validationEngine.Valid(&params)
-	if err != nil {
-		return "", err
-	}
-
 	if params.Category != "" {
 		if !models.IsValidCategory(params.Category) {
 			return "Invalid category.", nil
@@ -447,6 +500,32 @@ func validateExpenseListQueryParams(params ExpenseListQueryParams) (string, erro
 		if err != nil || limit <= 0 {
 			return "Limit must be greater than 0.", nil
 		}
+	}
+
+	return "", nil
+}
+
+func validateExpenseSummaryQueryParams(params ExpenseSummaryQueryParams) (string, error) {
+	if params.DateFrom == "" {
+		return "date_from is required.", nil
+	}
+
+	if params.DateTo == "" {
+		return "date_to is required.", nil
+	}
+
+	_, err := time.Parse("2006-01-02", params.DateFrom)
+	if err != nil {
+		return "Invalid date_from format. Use YYYY-MM-DD.", nil
+	}
+
+	_, err = time.Parse("2006-01-02", params.DateTo)
+	if err != nil {
+		return "Invalid date_to format. Use YYYY-MM-DD.", nil
+	}
+
+	if params.DateTo < params.DateFrom {
+		return "date_to cannot be earlier than date_from.", nil
 	}
 
 	return "", nil
@@ -580,4 +659,56 @@ func limitExpenses(expenses []models.Expense, params ExpenseListQueryParams) ([]
 	}
 
 	return expenses, nil
+}
+
+func generateExpenseSummary(expenses []models.Expense, params ExpenseSummaryQueryParams) ExpenseSummaryResponse {
+	filteredExpenses := filterExpensesByDateRange(expenses, params.DateFrom, params.DateTo)
+
+	// Initialize aggregation variables
+	totalAmount := 0.0
+	categoryMap := make(map[string]*CategorySummary)
+
+	// Aggregate total amount and group by category
+	for _, expense := range filteredExpenses {
+		totalAmount += expense.Amount
+
+		// Initialize category bucket if not exists
+		if _, exists := categoryMap[expense.Category]; !exists {
+			categoryMap[expense.Category] = &CategorySummary{
+				Category: expense.Category,
+			}
+		}
+
+		// Update category-wise totals
+		categoryMap[expense.Category].Total += expense.Amount
+		categoryMap[expense.Category].Count++
+	}
+
+	// Convert map to slice for response consistency
+	categorySummaries := make([]CategorySummary, 0, len(categoryMap))
+
+	for _, summary := range categoryMap {
+		categorySummaries = append(categorySummaries, *summary)
+	}
+
+	// Build final response object
+	return ExpenseSummaryResponse{
+		DateFrom:    params.DateFrom,
+		DateTo:      params.DateTo,
+		TotalAmount: totalAmount,
+		TotalCount:  len(filteredExpenses),
+		ByCategory:  categorySummaries,
+	}
+}
+
+func filterExpensesByDateRange(expenses []models.Expense, from, to string) []models.Expense {
+	filtered := make([]models.Expense, 0)
+
+	for _, expense := range expenses {
+		if expense.ExpenseDate >= from && expense.ExpenseDate <= to {
+			filtered = append(filtered, expense)
+		}
+	}
+
+	return filtered
 }
