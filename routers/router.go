@@ -25,6 +25,7 @@ func init() {
 			beego.NSRouter("/:id", &controllers.ExpenseController{}, "get:GetByID"),
 			beego.NSRouter("", &controllers.ExpenseController{}, "post:Create"),
 			beego.NSRouter("/:id", &controllers.ExpenseController{}, "put:Update"),
+			beego.NSRouter("/:id", &controllers.ExpenseController{}, "delete:Delete"),
 		),
 	)
 

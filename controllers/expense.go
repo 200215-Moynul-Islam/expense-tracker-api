@@ -216,6 +216,37 @@ func (c *ExpenseController) Update() {
 	c.Success(http.StatusOK, "Expense updated successfully.", updatedExpense)
 }
 
+func (c *ExpenseController) Delete() {
+	userID := c.Ctx.Input.GetData("userID").(int)
+
+	idStr := c.Ctx.Input.Param(":id")
+	if idStr == "" {
+		c.Error(http.StatusBadRequest, "Expense id is required.")
+		return
+	}
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		c.Error(http.StatusBadRequest, "Invalid expense id.")
+		return
+	}
+
+	err = models.DeleteExpense(id, userID)
+	if err != nil {
+		logs.Error("failed to delete expense:", err)
+
+		if err.Error() == "expense not found" {
+			c.Error(http.StatusNotFound, "Expense not found.")
+			return
+		}
+
+		c.Error(http.StatusInternalServerError, "Internal server error.")
+		return
+	}
+
+	c.Success(http.StatusOK, "Expense deleted successfully.", nil)
+}
+
 // Private helper functions
 
 func normalizeCreateExpenseRequest(req *CreateExpenseRequest) {
