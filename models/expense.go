@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/csv"
+	"errors"
 	"os"
 	"strconv"
 
@@ -144,4 +145,148 @@ func GetExpenseByID(id int, userID int) (*Expense, error) {
 	}
 
 	return nil, nil
+}
+
+func CreateExpense(expense Expense) error {
+	if err := utils.EnsureCSVFile(expenseCSVPath, expenseCSVHeader); err != nil {
+		return err
+	}
+
+	file, err := os.OpenFile(expenseCSVPath, os.O_APPEND|os.O_WRONLY, expenseFilePermission)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+
+	err = writer.Write([]string{
+		strconv.Itoa(expense.ID),
+		strconv.Itoa(expense.UserID),
+		expense.Title,
+		strconv.FormatFloat(expense.Amount, 'f', 2, 64), // Format amount with 2 decimal places
+		expense.Category,
+		expense.Note,
+		expense.ExpenseDate,
+		expense.CreatedAt,
+	})
+	if err != nil {
+		return err
+	}
+
+	writer.Flush()
+
+	return writer.Error()
+}
+
+func GetNextExpenseID() (int, error) {
+	expenses, err := GetAllExpenses()
+	if err != nil {
+		return 0, err
+	}
+
+	maxID := 0
+
+	for _, e := range expenses {
+		maxID = max(maxID, e.ID)
+	}
+
+	return maxID + 1, nil
+}
+
+func UpdateExpense(updated Expense) error {
+	expenses, err := GetAllExpenses()
+	if err != nil {
+		return err
+	}
+
+	found := false
+
+	for i, e := range expenses {
+		if e.ID == updated.ID && e.UserID == updated.UserID {
+			expenses[i] = updated
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return errors.New("expense not found")
+	}
+
+	return writeAllExpenses(expenses)
+}
+
+func DeleteExpense(id int, userID int) error {
+	expenses, err := GetAllExpenses()
+	if err != nil {
+		return err
+	}
+
+	found := false
+	result := make([]Expense, 0)
+
+	for _, e := range expenses {
+		if e.ID == id && e.UserID == userID {
+			found = true
+			continue
+		}
+		result = append(result, e)
+	}
+
+	if !found {
+		return errors.New("expense not found")
+	}
+
+	return writeAllExpenses(result)
+}
+
+func IsValidCategory(category string) bool {
+	for _, c := range AllowedCategories {
+		if c == category {
+			return true
+		}
+	}
+	return false
+}
+
+
+// Private Methods
+func writeAllExpenses(expenses []Expense) error {
+	err := utils.EnsureCSVFile(expenseCSVPath, expenseCSVHeader)
+	if err != nil {
+		return err
+	}
+
+	file, err := os.Create(expenseCSVPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+
+	err = writer.Write(expenseCSVHeader)
+	if err != nil {
+		return err
+	}
+
+	for _, e := range expenses {
+		err = writer.Write([]string{
+			strconv.Itoa(e.ID),
+			strconv.Itoa(e.UserID),
+			e.Title,
+			strconv.FormatFloat(e.Amount, 'f', 2, 64), // Format amount with 2 decimal places
+			e.Category,
+			e.Note,
+			e.ExpenseDate,
+			e.CreatedAt,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	writer.Flush()
+	return writer.Error()
 }
