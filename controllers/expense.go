@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -80,6 +81,51 @@ func (c *ExpenseController) Create() {
 	}
 
 	c.Success(http.StatusCreated, "Expense created successfully.", expense)
+}
+
+func (c *ExpenseController) GetAll() {
+	userID := c.Ctx.Input.GetData("userID").(int)
+
+	expenses, err := models.GetExpensesByUserID(userID)
+	if err != nil {
+		logs.Error("failed to get expenses:", err)
+
+		c.Error(http.StatusInternalServerError, "Internal server error.")
+		return
+	}
+
+	c.Success(http.StatusOK, "Expenses retrieved successfully.", expenses)
+}
+
+func (c *ExpenseController) GetByID() {
+	userID := c.Ctx.Input.GetData("userID").(int)
+
+	idStr := c.Ctx.Input.Param(":id")
+	if idStr == "" {
+		c.Error(http.StatusBadRequest, "Expense id is required.")
+		return
+	}
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		c.Error(http.StatusBadRequest, "Invalid expense id.")
+		return
+	}
+
+	expense, err := models.GetExpenseByID(id, userID)
+	if err != nil {
+		logs.Error("failed to get expense by id:", err)
+
+		c.Error(http.StatusInternalServerError, "Internal server error.")
+		return
+	}
+
+	if expense == nil {
+		c.Error(http.StatusNotFound, "Expense not found.")
+		return
+	}
+
+	c.Success(http.StatusOK, "Expense retrieved successfully.", expense)
 }
 
 // Private helper functions
