@@ -2,6 +2,7 @@ package routers
 
 import (
 	"expense-tracker-api/controllers"
+	"expense-tracker-api/middlewares"
 
 	beego "github.com/beego/beego/v2/server/web"
 )
@@ -15,6 +16,16 @@ func init() {
 		beego.NSNamespace("/auth",
 			beego.NSRouter("/register", &controllers.AuthController{}, "post:Register"),
 			beego.NSRouter("/login", &controllers.AuthController{}, "post:Login"),
+		),
+
+		beego.NSNamespace("/expenses",
+			beego.NSBefore(middlewares.RequireAuthentication),
+
+			beego.NSRouter("", &controllers.ExpenseController{}, "get:GetAll"),
+			beego.NSRouter("/:id", &controllers.ExpenseController{}, "get:GetByID"),
+			beego.NSRouter("", &controllers.ExpenseController{}, "post:Create"),
+			beego.NSRouter("/:id", &controllers.ExpenseController{}, "put:Update"),
+			beego.NSRouter("/:id", &controllers.ExpenseController{}, "delete:Delete"),
 		),
 	)
 
