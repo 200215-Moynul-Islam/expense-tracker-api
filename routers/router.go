@@ -21,6 +21,8 @@ func init() {
 		beego.NSNamespace("/expenses",
 			beego.NSBefore(middlewares.RequireAuthentication),
 
+			beego.NSRouter("/summary", &controllers.ExpenseController{}, "get:GetSummary"),
+
 			beego.NSRouter("", &controllers.ExpenseController{}, "get:GetAll"),
 			beego.NSRouter("/:id", &controllers.ExpenseController{}, "get:GetByID"),
 			beego.NSRouter("", &controllers.ExpenseController{}, "post:Create"),

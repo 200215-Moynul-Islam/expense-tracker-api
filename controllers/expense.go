@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +32,34 @@ type UpdateExpenseRequest struct {
 	Category string `json:"category" valid:"Required"`
 	Note string `json:"note"`
 	ExpenseDate string `json:"expense_date" valid:"Required"`
+}
+
+type ExpenseListQueryParams struct {
+	Category string
+	DateFrom string
+	DateTo string
+	SortBy string
+	SortOrder string
+	Limit string
+}
+
+type ExpenseSummaryQueryParams struct {
+	DateFrom string
+	DateTo string
+}
+
+type CategorySummary struct {
+	Category string `json:"category"`
+	Total float64 `json:"total"`
+	Count int `json:"count"`
+}
+
+type ExpenseSummaryResponse struct {
+	DateFrom string `json:"date_from"`
+	DateTo string `json:"date_to"`
+	TotalAmount float64 `json:"total_amount"`
+	TotalCount int `json:"total_count"`
+	ByCategory []CategorySummary `json:"by_category"`
 }
 
 func (c *ExpenseController) Create() {
@@ -102,18 +131,40 @@ func (c *ExpenseController) GetAll() {
 		return
 	}
 
-	// Check if a limit query parameter is provided to limit the number of expenses returned.
-	limitStr := c.GetString("limit")
-	if limitStr != "" {
-		limit, err := strconv.Atoi(limitStr)
-		if err != nil || limit <= 0 {
-			c.Error(http.StatusBadRequest, "Invalid limit.")
-			return
-		}
+	queryParams := ExpenseListQueryParams{
+		Category: c.GetString("category"),
+		DateFrom: c.GetString("date_from"),
+		DateTo: c.GetString("date_to"),
+		SortBy: c.GetString("sort_by"),
+		SortOrder: c.GetString("sort_order"),
+		Limit: c.GetString("limit"),
+	}
 
-		if limit < len(expenses) {
-			expenses = expenses[:limit]
-		}
+	normalizeExpenseListQueryParams(&queryParams)
+
+	errMessage, err := validateExpenseListQueryParams(queryParams)
+	if err != nil {
+		logs.Error("failed to validate expense list query params:", err)
+
+		c.Error(http.StatusInternalServerError, "Internal server error.")
+		return
+	}
+
+	if errMessage != "" {
+		c.Error(http.StatusBadRequest, errMessage)
+		return
+	}
+
+	expenses = filterExpenses(expenses, queryParams)
+
+	sortExpenses(expenses, queryParams)
+
+	expenses, err = limitExpenses(expenses, queryParams)
+	if err != nil {
+		logs.Error("failed to limit expenses:", err)
+
+		c.Error(http.StatusInternalServerError, "Internal server error.")
+		return
 	}
 
 	c.Success(http.StatusOK, "Expenses retrieved successfully.", expenses)
@@ -261,6 +312,42 @@ func (c *ExpenseController) Delete() {
 	c.Success(http.StatusOK, "Expense deleted successfully.", nil)
 }
 
+func (c *ExpenseController) GetSummary() {
+	userID := c.Ctx.Input.GetData("userID").(int)
+
+	expenses, err := models.GetExpensesByUserID(userID)
+	if err != nil {
+		logs.Error("failed to get expenses:", err)
+
+		c.Error(http.StatusInternalServerError, "Internal server error.")
+		return
+	}
+
+	queryParams := ExpenseSummaryQueryParams{
+		DateFrom: c.GetString("date_from"),
+		DateTo: c.GetString("date_to"),
+	}
+
+	normalizeExpenseSummaryQueryParams(&queryParams)
+
+	errMessage, err := validateExpenseSummaryQueryParams(queryParams)
+	if err != nil {
+		logs.Error("failed to validate expense summary query params:", err)
+
+		c.Error(http.StatusInternalServerError, "Internal server error.")
+		return
+	}
+
+	if errMessage != "" {
+		c.Error(http.StatusBadRequest, errMessage)
+		return
+	}
+
+	summary := generateExpenseSummary(expenses, queryParams)
+
+	c.Success(http.StatusOK, "Summary generated successfully.", summary)
+}
+
 // Private helper functions
 
 func normalizeCreateExpenseRequest(req *CreateExpenseRequest) {
@@ -275,6 +362,20 @@ func normalizeUpdateExpenseRequest(req *UpdateExpenseRequest) {
 	req.Category = strings.TrimSpace(req.Category)
 	req.Note = strings.TrimSpace(req.Note)
 	req.ExpenseDate = strings.TrimSpace(req.ExpenseDate)
+}
+
+func normalizeExpenseListQueryParams(params *ExpenseListQueryParams) {
+	params.Category = strings.TrimSpace(params.Category)
+	params.DateFrom = strings.TrimSpace(params.DateFrom)
+	params.DateTo = strings.TrimSpace(params.DateTo)
+	params.SortBy = strings.TrimSpace(params.SortBy)
+	params.SortOrder = strings.TrimSpace(params.SortOrder)
+	params.Limit = strings.TrimSpace(params.Limit)
+}
+
+func normalizeExpenseSummaryQueryParams(params *ExpenseSummaryQueryParams) {
+	params.DateFrom = strings.TrimSpace(params.DateFrom)
+	params.DateTo = strings.TrimSpace(params.DateTo)
 }
 
 func validateCreateExpenseRequest(request CreateExpenseRequest) (string, error) {
@@ -359,6 +460,77 @@ func validateUpdateExpenseRequest(request UpdateExpenseRequest) (string, error) 
 	}
 }
 
+func validateExpenseListQueryParams(params ExpenseListQueryParams) (string, error) {
+	if params.Category != "" {
+		if !models.IsValidCategory(params.Category) {
+			return "Invalid category.", nil
+		}
+	}
+
+	if params.DateFrom != "" {
+		_, err := time.Parse("2006-01-02", params.DateFrom)
+		if err != nil {
+			return "Invalid date_from format. Use YYYY-MM-DD.", nil
+		}
+	}
+
+	if params.DateTo != "" {
+		_, err := time.Parse("2006-01-02", params.DateTo)
+		if err != nil {
+			return "Invalid date_to format. Use YYYY-MM-DD.", nil
+		}
+	}
+
+	if params.DateFrom != "" && params.DateTo != "" {
+		if params.DateTo < params.DateFrom {
+			return "date_to cannot be earlier than date_from.", nil
+		}
+	}
+
+	if params.SortBy != "" && params.SortBy != "amount" && params.SortBy != "expense_date" {
+		return "Invalid sort_by value.", nil
+	}
+
+	if params.SortOrder != "" && params.SortOrder != "asc" && params.SortOrder != "desc" {
+		return "Invalid sort_order value.", nil
+	}
+
+	if params.Limit != "" {
+		limit, err := strconv.Atoi(params.Limit)
+		if err != nil || limit <= 0 {
+			return "Limit must be greater than 0.", nil
+		}
+	}
+
+	return "", nil
+}
+
+func validateExpenseSummaryQueryParams(params ExpenseSummaryQueryParams) (string, error) {
+	if params.DateFrom == "" {
+		return "date_from is required.", nil
+	}
+
+	if params.DateTo == "" {
+		return "date_to is required.", nil
+	}
+
+	_, err := time.Parse("2006-01-02", params.DateFrom)
+	if err != nil {
+		return "Invalid date_from format. Use YYYY-MM-DD.", nil
+	}
+
+	_, err = time.Parse("2006-01-02", params.DateTo)
+	if err != nil {
+		return "Invalid date_to format. Use YYYY-MM-DD.", nil
+	}
+
+	if params.DateTo < params.DateFrom {
+		return "date_to cannot be earlier than date_from.", nil
+	}
+
+	return "", nil
+}
+
 func mapExpenseTitleError(validationError *validation.Error) string {
 	switch validationError.Name {
 	case "Required":
@@ -393,4 +565,150 @@ func mapExpenseDateError(validationError *validation.Error) string {
 	default:
 		return "Invalid expense date."
 	}
+}
+
+func filterExpenses(expenses []models.Expense, params ExpenseListQueryParams,) []models.Expense {
+	filteredExpenses := expenses
+
+	// Filter by category
+	if params.Category != "" {
+		result := make([]models.Expense, 0)
+
+		for _, expense := range filteredExpenses {
+			if expense.Category == params.Category {
+				result = append(result, expense)
+			}
+		}
+
+		filteredExpenses = result
+	}
+
+	// Filter by date from
+	if params.DateFrom != "" {
+		result := make([]models.Expense, 0)
+
+		for _, expense := range filteredExpenses {
+			if expense.ExpenseDate >= params.DateFrom {
+				result = append(result, expense)
+			}
+		}
+
+		filteredExpenses = result
+	}
+
+	// Filter by date to
+	if params.DateTo != "" {
+		result := make([]models.Expense, 0)
+
+		for _, expense := range filteredExpenses {
+			if expense.ExpenseDate <= params.DateTo {
+				result = append(result, expense)
+			}
+		}
+
+		filteredExpenses = result
+	}
+
+	return filteredExpenses
+}
+
+func sortExpenses(expenses []models.Expense, params ExpenseListQueryParams) {
+	sortOrder := params.SortOrder
+	
+	if params.SortBy == "" {
+		return
+	}
+
+	if sortOrder == "" {
+		sortOrder = "desc"
+	}
+
+	sort.Slice(expenses, func(i, j int) bool {
+		switch params.SortBy {
+		case "amount":
+			if sortOrder == "asc" {
+				return expenses[i].Amount < expenses[j].Amount
+			}
+
+			return expenses[i].Amount > expenses[j].Amount
+
+		case "expense_date":
+			if sortOrder == "asc" {
+				return expenses[i].ExpenseDate < expenses[j].ExpenseDate
+			}
+
+			return expenses[i].ExpenseDate > expenses[j].ExpenseDate
+		}
+
+		return false
+	})
+}
+
+func limitExpenses(expenses []models.Expense, params ExpenseListQueryParams) ([]models.Expense, error) {
+	if params.Limit == "" {
+		return expenses, nil
+	}
+
+	limit, err := strconv.Atoi(params.Limit)
+	if err != nil {
+		return nil, err
+	}
+
+	if limit < len(expenses) {
+		expenses = expenses[:limit]
+	}
+
+	return expenses, nil
+}
+
+func generateExpenseSummary(expenses []models.Expense, params ExpenseSummaryQueryParams) ExpenseSummaryResponse {
+	filteredExpenses := filterExpensesByDateRange(expenses, params.DateFrom, params.DateTo)
+
+	// Initialize aggregation variables
+	totalAmount := 0.0
+	categoryMap := make(map[string]*CategorySummary)
+
+	// Aggregate total amount and group by category
+	for _, expense := range filteredExpenses {
+		totalAmount += expense.Amount
+
+		// Initialize category bucket if not exists
+		if _, exists := categoryMap[expense.Category]; !exists {
+			categoryMap[expense.Category] = &CategorySummary{
+				Category: expense.Category,
+			}
+		}
+
+		// Update category-wise totals
+		categoryMap[expense.Category].Total += expense.Amount
+		categoryMap[expense.Category].Count++
+	}
+
+	// Convert map to slice for response consistency
+	categorySummaries := make([]CategorySummary, 0, len(categoryMap))
+
+	for _, summary := range categoryMap {
+		categorySummaries = append(categorySummaries, *summary)
+	}
+
+	// Build final response object
+	return ExpenseSummaryResponse{
+		DateFrom:    params.DateFrom,
+		DateTo:      params.DateTo,
+		TotalAmount: totalAmount,
+		TotalCount:  len(filteredExpenses),
+		ByCategory:  categorySummaries,
+	}
+}
+
+func filterExpensesByDateRange(expenses []models.Expense, from, to string) []models.Expense {
+	filtered := make([]models.Expense, 0)
+
+	for _, expense := range expenses {
+		if expense.ExpenseDate >= from && expense.ExpenseDate <= to {
+			filtered = append(filtered, expense)
+		}
+	}
+
+	return filtered
 }
