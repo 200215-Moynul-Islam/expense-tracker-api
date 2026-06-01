@@ -25,6 +25,14 @@ type CreateExpenseRequest struct {
 	ExpenseDate string `json:"expense_date" valid:"Required"`
 }
 
+type UpdateExpenseRequest struct {
+	Title string `json:"title" valid:"Required"`
+	Amount float64 `json:"amount"`
+	Category string `json:"category" valid:"Required"`
+	Note string `json:"note"`
+	ExpenseDate string `json:"expense_date" valid:"Required"`
+}
+
 func (c *ExpenseController) Create() {
 	userID := c.Ctx.Input.GetData("userID").(int)
 
@@ -128,6 +136,86 @@ func (c *ExpenseController) GetByID() {
 	c.Success(http.StatusOK, "Expense retrieved successfully.", expense)
 }
 
+func (c *ExpenseController) Update() {
+	userID := c.Ctx.Input.GetData("userID").(int)
+
+	idStr := c.Ctx.Input.Param(":id")
+	if idStr == "" {
+		c.Error(http.StatusBadRequest, "Expense id is required.")
+		return
+	}
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		c.Error(http.StatusBadRequest, "Invalid expense id.")
+		return
+	}
+
+	existingExpense, err := models.GetExpenseByID(id, userID)
+	if err != nil {
+		logs.Error("failed to get expense by id:", err)
+
+		c.Error(http.StatusInternalServerError, "Internal server error.")
+		return
+	}
+
+	if existingExpense == nil {
+		c.Error(http.StatusNotFound, "Expense not found.")
+		return
+	}
+
+	var req UpdateExpenseRequest
+
+	err = json.Unmarshal(c.Ctx.Input.RequestBody, &req)
+	if err != nil {
+		logs.Warn("failed to parse update expense request body:", err)
+
+		c.Error(http.StatusBadRequest, "Invalid request body.")
+		return
+	}
+
+	normalizeUpdateExpenseRequest(&req)
+
+	errMessage, err := validateUpdateExpenseRequest(req)
+	if err != nil {
+		logs.Error("failed to validate update expense request:", err)
+
+		c.Error(http.StatusInternalServerError, "Internal server error.")
+		return
+	}
+
+	if errMessage != "" {
+		c.Error(http.StatusBadRequest, errMessage)
+		return
+	}
+
+	updatedExpense := models.Expense{
+		ID: existingExpense.ID,
+		UserID: existingExpense.UserID,
+		Title: req.Title,
+		Amount: req.Amount,
+		Category: req.Category,
+		Note: req.Note,
+		ExpenseDate: req.ExpenseDate,
+		CreatedAt: existingExpense.CreatedAt,
+	}
+
+	err = models.UpdateExpense(updatedExpense)
+	if err != nil {
+		logs.Error("failed to update expense:", err)
+
+		if err.Error() == "expense not found" {
+			c.Error(http.StatusNotFound, "Expense not found.")
+			return
+		}
+
+		c.Error(http.StatusInternalServerError, "Internal server error.")
+		return
+	}
+
+	c.Success(http.StatusOK, "Expense updated successfully.", updatedExpense)
+}
+
 // Private helper functions
 
 func normalizeCreateExpenseRequest(req *CreateExpenseRequest) {
@@ -137,7 +225,55 @@ func normalizeCreateExpenseRequest(req *CreateExpenseRequest) {
 	req.ExpenseDate = strings.TrimSpace(req.ExpenseDate)
 }
 
+func normalizeUpdateExpenseRequest(req *UpdateExpenseRequest) {
+	req.Title = strings.TrimSpace(req.Title)
+	req.Category = strings.TrimSpace(req.Category)
+	req.Note = strings.TrimSpace(req.Note)
+	req.ExpenseDate = strings.TrimSpace(req.ExpenseDate)
+}
+
 func validateCreateExpenseRequest(request CreateExpenseRequest) (string, error) {
+	var validationEngine validation.Validation
+
+	ok, err := validationEngine.Valid(&request)
+	if err != nil {
+		return "", err
+	}
+
+	if ok {
+		_, err = time.Parse("2006-01-02", request.ExpenseDate)
+		if err != nil {
+			return "Expense date must be in YYYY-MM-DD format.", nil
+		}
+
+		if !models.IsValidCategory(request.Category) {
+			return "Invalid category.", nil
+		}
+
+		if request.Amount <= 0 {
+			return "Amount must be greater than 0.", nil
+		}
+
+		return "", nil
+	}
+
+	firstError := validationEngine.Errors[0]
+
+	switch firstError.Key {
+	case "Title":
+		return mapExpenseTitleError(firstError), nil
+	case "Amount":
+		return mapExpenseAmountError(firstError), nil
+	case "Category":
+		return mapExpenseCategoryError(firstError), nil
+	case "ExpenseDate":
+		return mapExpenseDateError(firstError), nil
+	default:
+		return "Invalid request data.", nil
+	}
+}
+
+func validateUpdateExpenseRequest(request UpdateExpenseRequest) (string, error) {
 	var validationEngine validation.Validation
 
 	ok, err := validationEngine.Valid(&request)
