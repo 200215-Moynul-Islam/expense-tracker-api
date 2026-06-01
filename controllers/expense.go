@@ -102,6 +102,20 @@ func (c *ExpenseController) GetAll() {
 		return
 	}
 
+	// Check if a limit query parameter is provided to limit the number of expenses returned.
+	limitStr := c.GetString("limit")
+	if limitStr != "" {
+		limit, err := strconv.Atoi(limitStr)
+		if err != nil || limit <= 0 {
+			c.Error(http.StatusBadRequest, "Invalid limit.")
+			return
+		}
+
+		if limit < len(expenses) {
+			expenses = expenses[:limit]
+		}
+	}
+
 	c.Success(http.StatusOK, "Expenses retrieved successfully.", expenses)
 }
 
