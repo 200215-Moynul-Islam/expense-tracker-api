@@ -405,7 +405,7 @@ func validateCreateExpenseRequest(request CreateExpenseRequest) (string, error) 
 
 	firstError := validationEngine.Errors[0]
 
-	switch firstError.Key {
+	switch firstError.Field {
 	case "Title":
 		return mapExpenseTitleError(firstError), nil
 	case "Amount":
@@ -446,7 +446,7 @@ func validateUpdateExpenseRequest(request UpdateExpenseRequest) (string, error) 
 
 	firstError := validationEngine.Errors[0]
 
-	switch firstError.Key {
+	switch firstError.Field {
 	case "Title":
 		return mapExpenseTitleError(firstError), nil
 	case "Amount":

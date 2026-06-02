@@ -163,7 +163,7 @@ func validateRegisterRequest(request RegisterRequest) (string, error) {
 
 	firstError := validationEngine.Errors[0]
 
-	switch firstError.Key {
+	switch firstError.Field {
 	case "Name":
 		return mapNameError(firstError), nil
 	case "Email":
@@ -189,7 +189,7 @@ func validateLoginRequest(request LoginRequest) (string, error) {
 
 	firstError := validationEngine.Errors[0]
 
-	switch firstError.Key {
+	switch firstError.Field {
 	case "Email":
 		return mapEmailError(firstError), nil
 	case "Password":
