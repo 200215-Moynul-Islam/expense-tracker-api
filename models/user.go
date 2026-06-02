@@ -25,11 +25,11 @@ var userCSVHeader = []string{
 }
 
 type User struct {
-	ID int
-	Name string
-	Email string
-	Password string
-	CreatedAt string
+	ID int `json:"id"`
+	Name string `json:"name"`
+	Email string `json:"email"`
+	Password string `json:"password"`
+	CreatedAt string `json:"created_at"`
 }
 
 func GetAllUsers() ([]User, error) {
