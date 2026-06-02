@@ -13,9 +13,10 @@ import (
 
 const (
 	totalExpenseFields = 8
-	expenseCSVPath = "data/expenses.csv"
 	expenseFilePermission = 0644
 )
+
+var ExpenseCSVPath = "data/expenses.csv" // Can't be a constant because we need to modify it in tests.
 
 var expenseCSVHeader = []string{
 	"id",
@@ -52,17 +53,19 @@ type Expense struct {
 }
 
 func GetAllExpenses() ([]Expense, error) {
-	if err := utils.EnsureCSVFile(expenseCSVPath, expenseCSVHeader); err != nil {
+	if err := utils.EnsureCSVFile(ExpenseCSVPath, expenseCSVHeader); err != nil {
 		return nil, err
 	}
 
-	file, err := os.Open(expenseCSVPath)
+	file, err := os.Open(ExpenseCSVPath)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	records, err := csv.NewReader(file).ReadAll()
+	reader := csv.NewReader(file)
+	reader.FieldsPerRecord = -1 // Allow variable number of fields per record to handle malformed rows gracefully.
+	records, err := reader.ReadAll()
 	if err != nil {
 		return nil, err
 	}
@@ -148,11 +151,11 @@ func GetExpenseByID(id int, userID int) (*Expense, error) {
 }
 
 func CreateExpense(expense Expense) error {
-	if err := utils.EnsureCSVFile(expenseCSVPath, expenseCSVHeader); err != nil {
+	if err := utils.EnsureCSVFile(ExpenseCSVPath, expenseCSVHeader); err != nil {
 		return err
 	}
 
-	file, err := os.OpenFile(expenseCSVPath, os.O_APPEND|os.O_WRONLY, expenseFilePermission)
+	file, err := os.OpenFile(ExpenseCSVPath, os.O_APPEND|os.O_WRONLY, expenseFilePermission)
 	if err != nil {
 		return err
 	}
@@ -253,12 +256,12 @@ func IsValidCategory(category string) bool {
 
 // Private Methods
 func writeAllExpenses(expenses []Expense) error {
-	err := utils.EnsureCSVFile(expenseCSVPath, expenseCSVHeader)
+	err := utils.EnsureCSVFile(ExpenseCSVPath, expenseCSVHeader)
 	if err != nil {
 		return err
 	}
 
-	file, err := os.Create(expenseCSVPath)
+	file, err := os.Create(ExpenseCSVPath)
 	if err != nil {
 		return err
 	}

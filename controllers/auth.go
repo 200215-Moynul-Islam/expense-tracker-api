@@ -27,6 +27,16 @@ type LoginRequest struct {
 	Password string `json:"password" valid:"Required"`
 }
 
+// @Title Register User
+// @Description Register a new user
+// @Accept json
+// @Produce json
+// @Param body body RegisterRequest true "Register payload"
+// @Success 201 {object} APIResponse "User registered successfully"
+// @Failure 400 {object} APIResponse "Invalid request body or validation error"
+// @Failure 409 {object} APIResponse "Email already exists"
+// @Failure 500 {object} APIResponse "Internal server error"
+// @router /register [post]
 func (c *AuthController) Register() {
 	var req RegisterRequest
 
@@ -92,6 +102,16 @@ func (c *AuthController) Register() {
 	c.Success(http.StatusCreated, "User registered successfully.", nil)
 }
 
+// @Title Login User
+// @Description Authenticate user and return user data
+// @Accept json
+// @Produce json
+// @Param body body LoginRequest true "Login payload"
+// @Success 200 {object} APIResponse "Login successful"
+// @Failure 400 {object} APIResponse "Invalid request body or validation error"
+// @Failure 401 {object} APIResponse "Invalid email or password"
+// @Failure 500 {object} APIResponse "Internal server error"
+// @router /login [post]
 func (c *AuthController) Login() {
 	var req LoginRequest
 
@@ -133,8 +153,8 @@ func (c *AuthController) Login() {
 
 	c.Success(http.StatusOK, "Login successful.", map[string]interface{}{
 		"user_id": user.ID,
-		"name":    user.Name,
-		"email":   user.Email,
+		"name": user.Name,
+		"email": user.Email,
 	})
 }
 
@@ -163,7 +183,7 @@ func validateRegisterRequest(request RegisterRequest) (string, error) {
 
 	firstError := validationEngine.Errors[0]
 
-	switch firstError.Key {
+	switch firstError.Field {
 	case "Name":
 		return mapNameError(firstError), nil
 	case "Email":
@@ -189,7 +209,7 @@ func validateLoginRequest(request LoginRequest) (string, error) {
 
 	firstError := validationEngine.Errors[0]
 
-	switch firstError.Key {
+	switch firstError.Field {
 	case "Email":
 		return mapEmailError(firstError), nil
 	case "Password":

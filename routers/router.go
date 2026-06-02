@@ -33,3 +33,16 @@ func init() {
 
 	beego.AddNamespace(ns)
 }
+
+// Used only for Swagger doc generation.
+// Runtime routes are defined in init().
+func swaggerDocsNamespace() {
+	// Required for bee generate docs.
+	_ = beego.NewNamespace("/api/v1",
+		beego.NSInclude(
+			&controllers.HealthController{},
+			&controllers.AuthController{},
+			&controllers.ExpenseController{},
+		),
+	)
+}

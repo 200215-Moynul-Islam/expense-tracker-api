@@ -12,9 +12,10 @@ import (
 
 const (
 	totalUserFields = 5
-	userCSVPath = "data/users.csv"
 	userFilePermission = 0644
 )
+
+var UserCSVPath = "data/users.csv" // Can't make it a constant because we need to modify it in tests.
 
 var userCSVHeader = []string{
 	"id",
@@ -25,25 +26,27 @@ var userCSVHeader = []string{
 }
 
 type User struct {
-	ID int
-	Name string
-	Email string
-	Password string
-	CreatedAt string
+	ID int `json:"id"`
+	Name string `json:"name"`
+	Email string `json:"email"`
+	Password string `json:"password"`
+	CreatedAt string `json:"created_at"`
 }
 
 func GetAllUsers() ([]User, error) {
-	if err := utils.EnsureCSVFile(userCSVPath, userCSVHeader); err != nil {
+	if err := utils.EnsureCSVFile(UserCSVPath, userCSVHeader); err != nil {
 		return nil, err
 	}
 
-	file, err := os.Open(userCSVPath)
+	file, err := os.Open(UserCSVPath)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	records, err := csv.NewReader(file).ReadAll()
+	reader := csv.NewReader(file)
+	reader.FieldsPerRecord = -1 // Allow variable number of fields per record to handle malformed rows gracefully.
+	records, err := reader.ReadAll()
 	if err != nil {
 		return nil, err
 	}
@@ -109,11 +112,11 @@ func GetNextID() (int, error) {
 }
 
 func CreateUser(user User) error {
-	if err := utils.EnsureCSVFile(userCSVPath, userCSVHeader); err != nil {
+	if err := utils.EnsureCSVFile(UserCSVPath, userCSVHeader); err != nil {
 		return err
 	}
 
-	file, err := os.OpenFile(userCSVPath, os.O_APPEND|os.O_WRONLY, userFilePermission)
+	file, err := os.OpenFile(UserCSVPath, os.O_APPEND|os.O_WRONLY, userFilePermission)
 	if err != nil {
 		return err
 	}
