@@ -14,12 +14,19 @@ func init() {
 		beego.NSRouter("/health", &controllers.HealthController{}),
 
 		beego.NSNamespace("/auth",
+			beego.NSInclude(
+				&controllers.AuthController{},
+			),
 			beego.NSRouter("/register", &controllers.AuthController{}, "post:Register"),
 			beego.NSRouter("/login", &controllers.AuthController{}, "post:Login"),
 		),
 
 		beego.NSNamespace("/expenses",
 			beego.NSBefore(middlewares.RequireAuthentication),
+
+			beego.NSInclude(
+				&controllers.ExpenseController{},
+			),
 
 			beego.NSRouter("/summary", &controllers.ExpenseController{}, "get:GetSummary"),
 
@@ -32,17 +39,4 @@ func init() {
 	)
 
 	beego.AddNamespace(ns)
-}
-
-// Used only for Swagger doc generation.
-// Runtime routes are defined in init().
-func swaggerDocsNamespace() {
-	// Required for bee generate docs.
-	_ = beego.NewNamespace("/api/v1",
-		beego.NSInclude(
-			&controllers.HealthController{},
-			&controllers.AuthController{},
-			&controllers.ExpenseController{},
-		),
-	)
 }
