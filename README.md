@@ -83,7 +83,7 @@ go mod tidy
 ### 4. Run the Application
 
 ```bash
-go run main.go
+bee run
 ```
 
 Application will start at:
