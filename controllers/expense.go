@@ -62,6 +62,18 @@ type ExpenseSummaryResponse struct {
 	ByCategory []CategorySummary `json:"by_category"`
 }
 
+// Create creates a new expense
+// @Title Create Expense
+// @Description Create a new expense for authenticated user
+// @Tags Expense
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token"
+// @Param body body CreateExpenseRequest true "Create Expense Request"
+// @Success 201 {object} APIResponse "Expense created successfully"
+// @Failure 400 {object} APIResponse "Bad Request"
+// @Failure 500 {object} APIResponse "Internal Server Error"
+// @router /expenses [post]
 func (c *ExpenseController) Create() {
 	userID := c.Ctx.Input.GetData("userID").(int)
 
@@ -120,6 +132,23 @@ func (c *ExpenseController) Create() {
 	c.Success(http.StatusCreated, "Expense created successfully.", expense)
 }
 
+// GetAll returns all expenses for a user with filters
+// @Title Get All Expenses
+// @Description Get all expenses for authenticated user with filtering, sorting, and pagination
+// @Tags Expense
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token"
+// @Param category query string false "Filter by category"
+// @Param date_from query string false "Start date (YYYY-MM-DD)"
+// @Param date_to query string false "End date (YYYY-MM-DD)"
+// @Param sort_by query string false "amount or expense_date"
+// @Param sort_order query string false "asc or desc"
+// @Param limit query int false "Limit results"
+// @Success 200 {object} APIResponse "Expenses retrieved successfully"
+// @Failure 400 {object} APIResponse "Bad Request"
+// @Failure 500 {object} APIResponse "Internal Server Error"
+// @router /expenses [get]
 func (c *ExpenseController) GetAll() {
 	userID := c.Ctx.Input.GetData("userID").(int)
 
@@ -170,6 +199,19 @@ func (c *ExpenseController) GetAll() {
 	c.Success(http.StatusOK, "Expenses retrieved successfully.", expenses)
 }
 
+// GetByID returns a single expense by ID
+// @Title Get Expense By ID
+// @Description Get expense by ID for authenticated user
+// @Tags Expense
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token"
+// @Param id path int true "Expense ID"
+// @Success 200 {object} APIResponse "Expense retrieved successfully"
+// @Failure 400 {object} APIResponse "Invalid ID"
+// @Failure 404 {object} APIResponse "Expense not found"
+// @Failure 500 {object} APIResponse "Internal Server Error"
+// @router /expenses/{id} [get]
 func (c *ExpenseController) GetByID() {
 	userID := c.Ctx.Input.GetData("userID").(int)
 
@@ -201,6 +243,20 @@ func (c *ExpenseController) GetByID() {
 	c.Success(http.StatusOK, "Expense retrieved successfully.", expense)
 }
 
+// Update updates an existing expense
+// @Title Update Expense
+// @Description Update expense by ID for authenticated user
+// @Tags Expense
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token"
+// @Param id path int true "Expense ID"
+// @Param body body UpdateExpenseRequest true "Update Expense Request"
+// @Success 200 {object} APIResponse "Expense updated successfully"
+// @Failure 400 {object} APIResponse "Bad Request"
+// @Failure 404 {object} APIResponse "Expense not found"
+// @Failure 500 {object} APIResponse "Internal Server Error"
+// @router /expenses/{id} [put]
 func (c *ExpenseController) Update() {
 	userID := c.Ctx.Input.GetData("userID").(int)
 
@@ -281,6 +337,19 @@ func (c *ExpenseController) Update() {
 	c.Success(http.StatusOK, "Expense updated successfully.", updatedExpense)
 }
 
+// Delete deletes an expense
+// @Title Delete Expense
+// @Description Delete expense by ID for authenticated user
+// @Tags Expense
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token"
+// @Param id path int true "Expense ID"
+// @Success 200 {object} APIResponse "Expense deleted successfully"
+// @Failure 400 {object} APIResponse "Invalid ID"
+// @Failure 404 {object} APIResponse "Expense not found"
+// @Failure 500 {object} APIResponse "Internal Server Error"
+// @router /expenses/{id} [delete]
 func (c *ExpenseController) Delete() {
 	userID := c.Ctx.Input.GetData("userID").(int)
 
@@ -312,6 +381,19 @@ func (c *ExpenseController) Delete() {
 	c.Success(http.StatusOK, "Expense deleted successfully.", nil)
 }
 
+// GetSummary returns expense summary
+// @Title Get Expense Summary
+// @Description Get aggregated expense summary grouped by category and date range
+// @Tags Expense
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token"
+// @Param date_from query string true "Start date (YYYY-MM-DD)"
+// @Param date_to query string true "End date (YYYY-MM-DD)"
+// @Success 200 {object} ExpenseSummaryResponse "Summary generated successfully"
+// @Failure 400 {object} APIResponse "Bad Request"
+// @Failure 500 {object} APIResponse "Internal Server Error"
+// @router /expenses/summary [get]
 func (c *ExpenseController) GetSummary() {
 	userID := c.Ctx.Input.GetData("userID").(int)
 
