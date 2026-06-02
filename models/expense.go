@@ -13,9 +13,10 @@ import (
 
 const (
 	totalExpenseFields = 8
-	expenseCSVPath = "data/expenses.csv"
 	expenseFilePermission = 0644
 )
+
+var expenseCSVPath = "data/expenses.csv" // Can't be a constant because we need to modify it in tests.
 
 var expenseCSVHeader = []string{
 	"id",
@@ -62,7 +63,9 @@ func GetAllExpenses() ([]Expense, error) {
 	}
 	defer file.Close()
 
-	records, err := csv.NewReader(file).ReadAll()
+	reader := csv.NewReader(file)
+	reader.FieldsPerRecord = -1 // Allow variable number of fields per record to handle malformed rows gracefully.
+	records, err := reader.ReadAll()
 	if err != nil {
 		return nil, err
 	}
