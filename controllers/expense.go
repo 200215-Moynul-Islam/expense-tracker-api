@@ -68,12 +68,12 @@ type ExpenseSummaryResponse struct {
 // @Tags Expense
 // @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer token"
+// @Param X-User-ID header int true "User ID for authentication"
 // @Param body body CreateExpenseRequest true "Create Expense Request"
 // @Success 201 {object} APIResponse "Expense created successfully"
 // @Failure 400 {object} APIResponse "Bad Request"
 // @Failure 500 {object} APIResponse "Internal Server Error"
-// @router /expenses [post]
+// @router / [post]
 func (c *ExpenseController) Create() {
 	userID := c.Ctx.Input.GetData("userID").(int)
 
@@ -138,7 +138,7 @@ func (c *ExpenseController) Create() {
 // @Tags Expense
 // @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer token"
+// @Param X-User-ID header int true "User ID for authentication"
 // @Param category query string false "Filter by category"
 // @Param date_from query string false "Start date (YYYY-MM-DD)"
 // @Param date_to query string false "End date (YYYY-MM-DD)"
@@ -148,7 +148,7 @@ func (c *ExpenseController) Create() {
 // @Success 200 {object} APIResponse "Expenses retrieved successfully"
 // @Failure 400 {object} APIResponse "Bad Request"
 // @Failure 500 {object} APIResponse "Internal Server Error"
-// @router /expenses [get]
+// @router / [get]
 func (c *ExpenseController) GetAll() {
 	userID := c.Ctx.Input.GetData("userID").(int)
 
@@ -205,13 +205,13 @@ func (c *ExpenseController) GetAll() {
 // @Tags Expense
 // @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer token"
+// @Param X-User-ID header int true "User ID for authentication"
 // @Param id path int true "Expense ID"
 // @Success 200 {object} APIResponse "Expense retrieved successfully"
 // @Failure 400 {object} APIResponse "Invalid ID"
 // @Failure 404 {object} APIResponse "Expense not found"
 // @Failure 500 {object} APIResponse "Internal Server Error"
-// @router /expenses/{id} [get]
+// @router /{id} [get]
 func (c *ExpenseController) GetByID() {
 	userID := c.Ctx.Input.GetData("userID").(int)
 
@@ -249,14 +249,14 @@ func (c *ExpenseController) GetByID() {
 // @Tags Expense
 // @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer token"
+// @Param X-User-ID header int true "User ID for authentication"
 // @Param id path int true "Expense ID"
 // @Param body body UpdateExpenseRequest true "Update Expense Request"
 // @Success 200 {object} APIResponse "Expense updated successfully"
 // @Failure 400 {object} APIResponse "Bad Request"
 // @Failure 404 {object} APIResponse "Expense not found"
 // @Failure 500 {object} APIResponse "Internal Server Error"
-// @router /expenses/{id} [put]
+// @router /{id} [put]
 func (c *ExpenseController) Update() {
 	userID := c.Ctx.Input.GetData("userID").(int)
 
@@ -343,13 +343,13 @@ func (c *ExpenseController) Update() {
 // @Tags Expense
 // @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer token"
+// @Param X-User-ID header int true "User ID for authentication"
 // @Param id path int true "Expense ID"
 // @Success 200 {object} APIResponse "Expense deleted successfully"
 // @Failure 400 {object} APIResponse "Invalid ID"
 // @Failure 404 {object} APIResponse "Expense not found"
 // @Failure 500 {object} APIResponse "Internal Server Error"
-// @router /expenses/{id} [delete]
+// @router /{id} [delete]
 func (c *ExpenseController) Delete() {
 	userID := c.Ctx.Input.GetData("userID").(int)
 
@@ -387,13 +387,13 @@ func (c *ExpenseController) Delete() {
 // @Tags Expense
 // @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer token"
+// @Param X-User-ID header int true "User ID for authentication"
 // @Param date_from query string true "Start date (YYYY-MM-DD)"
 // @Param date_to query string true "End date (YYYY-MM-DD)"
 // @Success 200 {object} ExpenseSummaryResponse "Summary generated successfully"
 // @Failure 400 {object} APIResponse "Bad Request"
 // @Failure 500 {object} APIResponse "Internal Server Error"
-// @router /expenses/summary [get]
+// @router /summary [get]
 func (c *ExpenseController) GetSummary() {
 	userID := c.Ctx.Input.GetData("userID").(int)
 
